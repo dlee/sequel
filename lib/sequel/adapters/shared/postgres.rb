@@ -757,7 +757,7 @@ module Sequel
       end
       
       # Use WITH RECURSIVE instead of WITH if any of the CTEs is recursive
-      def select_with_sql_base
+      def with_sql_base
         opts[:with].any?{|w| w[:recursive]} ? SQL_WITH_RECURSIVE : super
       end
       

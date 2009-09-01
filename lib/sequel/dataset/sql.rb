@@ -22,10 +22,10 @@ module Sequel
     QUALIFY_KEYS = [:select, :where, :having, :order, :group]
     QUESTION_MARK = '?'.freeze
     STOCK_COUNT_OPTS = {:select => [SQL::AliasedExpression.new(LiteralString.new("COUNT(*)").freeze, :count)], :order => nil}.freeze
-    DELETE_CLAUSE_METHODS = clause_methods(:delete, %w'from where')
-    INSERT_CLAUSE_METHODS = clause_methods(:insert, %w'into columns values')
+    DELETE_CLAUSE_METHODS = clause_methods(:delete, %w'with from where')
+    INSERT_CLAUSE_METHODS = clause_methods(:insert, %w'with into columns values')
     SELECT_CLAUSE_METHODS = clause_methods(:select, %w'with distinct columns from join where group having compounds order limit')
-    UPDATE_CLAUSE_METHODS = clause_methods(:update, %w'table set where')
+    UPDATE_CLAUSE_METHODS = clause_methods(:update, %w'with table set where')
     TIMESTAMP_FORMAT = "'%Y-%m-%d %H:%M:%S%N%z'".freeze
     STANDARD_TIMESTAMP_FORMAT = "TIMESTAMP #{TIMESTAMP_FORMAT}".freeze
     TWO_ARITY_OPERATORS = ::Sequel::SQL::ComplexExpression::TWO_ARITY_OPERATORS
@@ -951,7 +951,7 @@ module Sequel
 
     # Do a simple join of the arguments (which should be strings or symbols) separated by commas
     def argument_list(args)
-      args.join(COMMA_SEPARATOR)
+      args.map{|a| quote_identifier(a)}.join(COMMA_SEPARATOR)
     end
 
     # SQL fragment for specifying an alias.  expression should already be literalized.
@@ -1036,7 +1036,7 @@ module Sequel
       when String
         LiteralString.new("(#{expr})")
       else
-        raise(Error, 'Invalid filter argument')
+        raise(Error, "Invalid filter argument: #{expr.inspect}")
       end
     end
     
@@ -1361,13 +1361,16 @@ module Sequel
     
     # SQL Fragment specifying the WITH clause
     def select_with_sql(sql)
-      ws = opts[:with]
+      ws = @opts[:with]
       return if !ws || ws.empty?
-      sql.replace("#{select_with_sql_base}#{ws.map{|w| "#{w[:name]}#{"(#{argument_list(w[:args])})" if w[:args]} AS (#{subselect_sql(w[:dataset])})"}.join(COMMA_SEPARATOR)} #{sql}")
+      sql.replace("#{with_sql_base}#{ws.map{|w| "#{table_ref w[:name]}#{"(#{argument_list(w[:args])})" if w[:args]} AS (#{subselect_sql(w[:dataset])})"}.join(COMMA_SEPARATOR)} #{sql}")
     end
+    alias delete_with_sql select_with_sql
+    alias update_with_sql select_with_sql
+    alias insert_with_sql select_with_sql
     
     # The base keyword to use for the SQL WITH clause
-    def select_with_sql_base
+    def with_sql_base
       SQL_WITH
     end
 

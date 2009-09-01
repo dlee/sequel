@@ -2342,6 +2342,7 @@ context "Dataset#import" do
       'COMMIT',
     ]
   end
+
   specify "should accept a columns array and a values array with slice option" do
     @ds.import([:x, :y], [[1, 2], [3, 4], [5, 6]], :slice => 2)
     @db.sqls.should == [
@@ -2354,6 +2355,20 @@ context "Dataset#import" do
       'COMMIT'
     ]
   end
+
+  specify "should work with #with" do
+    @ds.with(:items, @db[:inventory].group(:type)).import([:x, :y], [[1, 2], [3, 4], [5, 6]], :slice => 2)
+    @db.sqls.should == [
+      'BEGIN',
+      "WITH items AS (SELECT * FROM inventory GROUP BY type) INSERT INTO items (x, y) VALUES (1, 2)",
+      "WITH items AS (SELECT * FROM inventory GROUP BY type) INSERT INTO items (x, y) VALUES (3, 4)",
+      'COMMIT',
+      'BEGIN',
+      "WITH items AS (SELECT * FROM inventory GROUP BY type) INSERT INTO items (x, y) VALUES (5, 6)",
+      'COMMIT'
+    ]
+  end
+
 end
 
 context "Dataset#multi_insert" do
@@ -2494,6 +2509,11 @@ context "Dataset" do
     @d.sql.should == "SELECT * FROM x WHERE (y = 1)"
   end
 
+  specify "should support self-changing group!" do
+    @d.group!(:y)
+    @d.sql.should == "SELECT * FROM x GROUP BY y"
+  end
+
   specify "should support self-changing filter! with block" do
     @d.filter!{:y.sql_number < 2}
     @d.sql.should == "SELECT * FROM x WHERE (y < 2)"
@@ -2581,6 +2601,11 @@ context "Dataset#insert_sql" do
 
   specify "should accept array subscript references" do
     @ds.insert_sql((:day.sql_subscript(1)) => 'd').should == "INSERT INTO items (day[1]) VALUES ('d')"
+  end
+
+  specify "should accept datasets" do
+    @stuff = Sequel::Dataset.new(nil).from(:stuff)
+    @ds.insert_sql(@stuff).should == "INSERT INTO items SELECT * FROM stuff"
   end
 
   specify "should raise an Error if the dataset has no sources" do
@@ -3104,14 +3129,37 @@ context "Sequel::Dataset #with and #with_recursive" do
   specify "#with_recursive should take a name, nonrecursive dataset, and recursive dataset, and use a WITH clause" do
     @ds.with_recursive(:t, @db[:x], @db[:t]).sql.should == 'WITH t AS (SELECT * FROM x UNION ALL SELECT * FROM t) SELECT * FROM t'
   end
+
+  specify "should be able to update" do
+    @ds.with(:t, @db[:x]).update_sql(:x => :y).should == 'WITH t AS (SELECT * FROM x) UPDATE t SET x = y'
+    @ds.with_recursive(:t, @db[:x], @db[:t]).update_sql(:x => :y).should == 'WITH t AS (SELECT * FROM x UNION ALL SELECT * FROM t) UPDATE t SET x = y'
+  end
   
-  specify "#with and #with_recursive should add to existing WITH clause if called multiple times" do
+  specify "should be able to delete" do
+    @ds.with(:t, @db[:x]).filter(:y => 1).delete_sql.should == 'WITH t AS (SELECT * FROM x) DELETE FROM t WHERE (y = 1)'
+    @ds.with_recursive(:t, @db[:x], @db[:t]).filter(:y => 1).delete_sql.should == 'WITH t AS (SELECT * FROM x UNION ALL SELECT * FROM t) DELETE FROM t WHERE (y = 1)'
+  end
+  
+  specify "should be able to insert" do
+    @ds.with(:t, @db[:x]).insert_sql(@db[:t]).should == 'WITH t AS (SELECT * FROM x) INSERT INTO t SELECT * FROM t'
+    @ds.with_recursive(:t, @db[:x], @db[:t]).insert_sql(@db[:t]).should == 'WITH t AS (SELECT * FROM x UNION ALL SELECT * FROM t) INSERT INTO t SELECT * FROM t'
+  end
+  
+  specify "should add to existing WITH clause if called multiple times" do
     @ds.with(:t, @db[:x]).with(:j, @db[:y]).sql.should == 'WITH t AS (SELECT * FROM x), j AS (SELECT * FROM y) SELECT * FROM t'
     @ds.with_recursive(:t, @db[:x], @db[:t]).with_recursive(:j, @db[:y], @db[:j]).sql.should == 'WITH t AS (SELECT * FROM x UNION ALL SELECT * FROM t), j AS (SELECT * FROM y UNION ALL SELECT * FROM j) SELECT * FROM t'
     @ds.with(:t, @db[:x]).with_recursive(:j, @db[:y], @db[:j]).sql.should == 'WITH t AS (SELECT * FROM x), j AS (SELECT * FROM y UNION ALL SELECT * FROM j) SELECT * FROM t'
   end
   
-  specify "#with and #with_recursive should take an :args option" do
+  specify "should be able to join" do
+    ds = Sequel::Dataset.new(nil).from(:inventory).group(:item_id)
+    ds2 = Sequel::Dataset.new(nil).from(:attributes)
+
+    @db[:items].with(:items, ds).left_outer_join(ds2, :id => :attribute_id).sql.should ==
+      'WITH items AS (SELECT * FROM inventory GROUP BY item_id) SELECT * FROM items LEFT OUTER JOIN (SELECT * FROM attributes) AS t1 ON (t1.id = items.attribute_id)'
+  end
+
+  specify "should take an :args option" do
     @ds.with(:t, @db[:x], :args=>[:b]).sql.should == 'WITH t(b) AS (SELECT * FROM x) SELECT * FROM t'
     @ds.with_recursive(:t, @db[:x], @db[:t], :args=>[:b, :c]).sql.should == 'WITH t(b, c) AS (SELECT * FROM x UNION ALL SELECT * FROM t) SELECT * FROM t'
   end
@@ -3120,7 +3168,7 @@ context "Sequel::Dataset #with and #with_recursive" do
     @ds.with_recursive(:t, @db[:x], @db[:t], :union_all=>false).sql.should == 'WITH t AS (SELECT * FROM x UNION SELECT * FROM t) SELECT * FROM t'
   end
 
-  specify "#with and #with_recursive should raise an error unless the dataset supports CTEs" do
+  specify "should raise an error unless the dataset supports CTEs" do
     @ds.meta_def(:supports_cte?){false}
     proc{@ds.with(:t, @db[:x], :args=>[:b])}.should raise_error(Sequel::Error)
     proc{@ds.with_recursive(:t, @db[:x], @db[:t], :args=>[:b, :c])}.should raise_error(Sequel::Error)
