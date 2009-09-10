@@ -22,10 +22,10 @@ module Sequel
     QUALIFY_KEYS = [:select, :where, :having, :order, :group]
     QUESTION_MARK = '?'.freeze
     STOCK_COUNT_OPTS = {:select => [SQL::AliasedExpression.new(LiteralString.new("COUNT(*)").freeze, :count)], :order => nil}.freeze
-    DELETE_CLAUSE_METHODS = clause_methods(:delete, %w'with from where')
-    INSERT_CLAUSE_METHODS = clause_methods(:insert, %w'with into columns values')
+    DELETE_CLAUSE_METHODS = clause_methods(:delete, %w'from where')
+    INSERT_CLAUSE_METHODS = clause_methods(:insert, %w'into columns values')
     SELECT_CLAUSE_METHODS = clause_methods(:select, %w'with distinct columns from join where group having compounds order limit')
-    UPDATE_CLAUSE_METHODS = clause_methods(:update, %w'with table set where')
+    UPDATE_CLAUSE_METHODS = clause_methods(:update, %w'table set where')
     TIMESTAMP_FORMAT = "'%Y-%m-%d %H:%M:%S%N%z'".freeze
     STANDARD_TIMESTAMP_FORMAT = "TIMESTAMP #{TIMESTAMP_FORMAT}".freeze
     TWO_ARITY_OPERATORS = ::Sequel::SQL::ComplexExpression::TWO_ARITY_OPERATORS

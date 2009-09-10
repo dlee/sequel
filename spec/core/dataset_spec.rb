@@ -2356,19 +2356,6 @@ context "Dataset#import" do
     ]
   end
 
-  specify "should work with #with" do
-    @ds.with(:items, @db[:inventory].group(:type)).import([:x, :y], [[1, 2], [3, 4], [5, 6]], :slice => 2)
-    @db.sqls.should == [
-      'BEGIN',
-      "WITH items AS (SELECT * FROM inventory GROUP BY type) INSERT INTO items (x, y) VALUES (1, 2)",
-      "WITH items AS (SELECT * FROM inventory GROUP BY type) INSERT INTO items (x, y) VALUES (3, 4)",
-      'COMMIT',
-      'BEGIN',
-      "WITH items AS (SELECT * FROM inventory GROUP BY type) INSERT INTO items (x, y) VALUES (5, 6)",
-      'COMMIT'
-    ]
-  end
-
 end
 
 context "Dataset#multi_insert" do

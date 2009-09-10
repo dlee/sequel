@@ -169,10 +169,10 @@ module Sequel
       BOOL_TRUE = '1'.freeze
       BOOL_FALSE = '0'.freeze
       COMMA_SEPARATOR = ', '.freeze
-      DELETE_CLAUSE_METHODS = Dataset.clause_methods(:delete, %w'from output from2 where')
-      INSERT_CLAUSE_METHODS = Dataset.clause_methods(:insert, %w'into columns output values')
+      DELETE_CLAUSE_METHODS = Dataset.clause_methods(:delete, %w'with from output from2 where')
+      INSERT_CLAUSE_METHODS = Dataset.clause_methods(:insert, %w'with into columns output values')
       SELECT_CLAUSE_METHODS = Dataset.clause_methods(:select, %w'with limit distinct columns from table_options join where group order having compounds')
-      UPDATE_CLAUSE_METHODS = Dataset.clause_methods(:update, %w'table set output from where')
+      UPDATE_CLAUSE_METHODS = Dataset.clause_methods(:update, %w'with table set output from where')
       WILDCARD = LiteralString.new('*').freeze
       CONSTANT_MAP = {:CURRENT_DATE=>'CAST(CURRENT_TIMESTAMP AS DATE)'.freeze, :CURRENT_TIME=>'CAST(CURRENT_TIMESTAMP AS TIME)'.freeze}
 
@@ -300,6 +300,7 @@ module Sequel
       end
 
       # MSSQL supports the OUTPUT clause for DELETE statements
+      # It also allows prepending a WITH clause
       def delete_clause_methods
         DELETE_CLAUSE_METHODS
       end
@@ -322,6 +323,7 @@ module Sequel
       alias update_from_sql from_sql
       
       # MSSQL supports the OUTPUT clause for INSERT statements
+      # It also allows prepending a WITH clause
       def insert_clause_methods
         INSERT_CLAUSE_METHODS
       end
@@ -386,6 +388,7 @@ module Sequel
       alias insert_output_sql output_sql
 
       # MSSQL supports the OUTPUT clause for UPDATE statements
+      # It also allows prepending a WITH clause
       def update_clause_methods
         UPDATE_CLAUSE_METHODS
       end

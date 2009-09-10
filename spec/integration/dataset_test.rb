@@ -345,12 +345,7 @@ if INTEGRATION_DB.dataset.supports_cte?
       @db.create_table!(:i2){Integer :id; Integer :parent_id}
       @ds = @db[:i1]
       @ds2 = @db[:i2]
-      @ds.insert(:id=>1)
-      @ds.insert(:id=>2)
-      @ds.insert(:id=>3, :parent_id=>1)
-      @ds.insert(:id=>4, :parent_id=>1)
-      @ds.insert(:id=>5, :parent_id=>3)
-      @ds.insert(:id=>6, :parent_id=>5)
+      @ds.import [:id, :parent_id], [[1,nil],[2,nil],[3,1],[4,1],[5,3],[6,5]]
     end
     after do
       @db.drop_table(:i1)
@@ -368,64 +363,6 @@ if INTEGRATION_DB.dataset.supports_cte?
       ps.call(:n=>1).should == [{:id=>3, :parent_id=>1}, {:id=>4, :parent_id=>1}, {:id=>5, :parent_id=>3}, {:id=>6, :parent_id=>5}]
       ps.call(:n=>3).should == [{:id=>5, :parent_id=>3}, {:id=>6, :parent_id=>5}]
       ps.call(:n=>5).should == [{:id=>6, :parent_id=>5}]
-    end
-
-    specify "using #with should be able to update" do
-      @ds.insert(:id=>1)
-      @ds2.insert(:id=>2, :parent_id=>1)
-      @ds2.insert(:id=>3, :parent_id=>2)
-      @ds.with(:t, @ds2).filter(:id => @db[:t].select(:id)).update(:parent_id => @db[:t].filter(:id => :i1__id).select(:parent_id).limit(1))
-      @ds[:id => 1].should == {:id => 1, :parent_id => nil}
-      @ds[:id => 2].should == {:id => 2, :parent_id => 1}
-      @ds[:id => 3].should == {:id => 3, :parent_id => 2}
-      @ds[:id => 4].should == {:id => 4, :parent_id => 1}
-    end
-
-    specify "using #with_recursive should be able to update" do
-      ds = @ds.with_recursive(:t, @ds.filter(:parent_id=>1).or(:id => 1), @ds.join(:t, :i=>:parent_id).select(:i1__id, :i1__parent_id), :args=>[:i, :pi])
-      ds.filter(~{:id => @db[:t].select(:i)}).update(:parent_id => 1)
-      @ds[:id => 1].should == {:id => 1, :parent_id => nil}
-      @ds[:id => 2].should == {:id => 2, :parent_id => 1}
-      @ds[:id => 5].should == {:id => 5, :parent_id => 3}
-    end
-
-    specify "using #with should be able to insert" do
-      @ds2.insert(:id=>7)
-      @ds.with(:t, @ds2).insert(@db[:t])
-      @ds[:id => 7].should == {:id => 7, :parent_id => nil}
-    end
-
-    specify "using #with_recursive should be able to insert" do
-      ds = @ds2.with_recursive(:t, @ds.filter(:parent_id=>1), @ds.join(:t, :i=>:parent_id).select(:i1__id, :i1__parent_id), :args=>[:i, :pi])
-      ds.insert @db[:t]
-      @ds2.all.should == [{:id => 3, :parent_id => 1}, {:id => 4, :parent_id => 1}, {:id => 5, :parent_id => 3}, {:id => 6, :parent_id => 5}]
-    end
-
-    specify "using #with should be able to delete" do
-      @ds2.insert(:id=>6)
-      @ds2.insert(:id=>5)
-      @ds2.insert(:id=>4)
-      @ds.with(:t, @ds2).filter(:id => @db[:t].select(:id)).delete
-      @ds.all.should == [{:id => 1, :parent_id => nil}, {:id => 2, :parent_id => nil}, {:id => 3, :parent_id => 1}]
-    end
-
-    specify "using #with_recursive should be able to delete" do
-      @ds.insert(:id=>7, :parent_id=>2)
-      ds = @ds.with_recursive(:t, @ds.filter(:parent_id=>1), @ds.join(:t, :i=>:parent_id).select(:i1__id, :i1__parent_id), :args=>[:i, :pi])
-      ds.filter(:i1__id => @db[:t].select(:i)).delete
-      @ds.all.should == [{:id => 1, :parent_id => nil}, {:id => 2, :parent_id => nil}, {:id => 7, :parent_id => 2}]
-    end
-
-    specify "using #with should be able to import" do
-      @ds2.insert(:id=>7)
-      @ds.with(:t, @ds2).import [:id, :parent_id], @db[:t].select(:id, :parent_id)
-      @ds[:id => 7].should == {:id => 7, :parent_id => nil}
-    end
-
-    specify "using #with_recursive should be able to import" do
-      ds = @ds2.with_recursive(:t, @ds.filter(:parent_id=>1), @ds.join(:t, :i=>:parent_id).select(:i1__id, :i1__parent_id), :args=>[:i, :pi])
-      ds.import [:id, :parent_id], @db[:t].select(:i, :pi)
-      @ds2.all.should == [{:id => 3, :parent_id => 1}, {:id => 4, :parent_id => 1}, {:id => 5, :parent_id => 3}, {:id => 6, :parent_id => 5}]
     end
   end
 end
